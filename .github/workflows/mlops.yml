@@ -49,6 +49,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.CLOUD_CREDENTIALS }}'
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
@@ -58,12 +63,18 @@ jobs:
 
       - name: Authenticate to Cloud Storage
         run: |
-          cat > /tmp/sa-key.json <<'EOF'
-          ${{ secrets.CLOUD_CREDENTIALS }}
+          echo "GOOGLE_APPLICATION_CREDENTIALS=${{ steps.auth.outputs.credentials_file_path }}" >> $GITHUB_ENV
+          dvc remote modify --local myremote credentialpath "${{ steps.auth.outputs.credentials_file_path }}"
+
+      - name: Verify bucket access
+        run: |
+          python - <<'EOF'
+          from google.cloud import storage
+
+          client = storage.Client()
+          bucket = client.bucket("${{ secrets.CLOUD_BUCKET }}")
+          print(f"Bucket exists: {bucket.exists()}")
           EOF
-          python -m json.tool /tmp/sa-key.json > /dev/null
-          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa-key.json" >> $GITHUB_ENV
-          dvc remote modify --local myremote credentialpath /tmp/sa-key.json
 
       - name: Pull data with DVC
         run: dvc pull data/train_phase1.csv.dvc data/eval.csv.dvc
