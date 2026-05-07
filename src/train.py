@@ -5,10 +5,27 @@ import yaml
 import json
 import joblib
 import os
+from pathlib import Path
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score
 
 EVAL_THRESHOLD = 0.70
+
+
+def _configure_local_mlflow_experiment() -> None:
+    """Ensure sqlite-based local tracking uses a file-backed artifact store."""
+    tracking_uri = mlflow.get_tracking_uri()
+    if not tracking_uri.startswith("sqlite:"):
+        return
+
+    experiment_name = "local-default"
+    artifact_location = Path("mlartifacts").resolve().as_uri()
+    client = mlflow.tracking.MlflowClient()
+
+    if client.get_experiment_by_name(experiment_name) is None:
+        client.create_experiment(experiment_name, artifact_location=artifact_location)
+
+    mlflow.set_experiment(experiment_name)
 
 
 def train(
@@ -35,6 +52,8 @@ def train(
     y_train = df_train["target"]
     X_eval = df_eval.drop(columns=["target"])
     y_eval = df_eval["target"]
+
+    _configure_local_mlflow_experiment()
 
     with mlflow.start_run():
 
