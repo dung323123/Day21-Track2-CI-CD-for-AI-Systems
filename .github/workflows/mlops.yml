@@ -72,8 +72,10 @@ jobs:
           from google.cloud import storage
 
           client = storage.Client()
-          bucket = client.bucket("${{ secrets.CLOUD_BUCKET }}")
-          print(f"Bucket exists: {bucket.exists()}")
+          blobs = client.list_blobs("${{ secrets.CLOUD_BUCKET }}", prefix="dvc/", max_results=1)
+          first = next(iter(blobs), None)
+          print(f"Object access check passed for gs://${{ secrets.CLOUD_BUCKET }}/dvc")
+          print(f"First blob: {getattr(first, 'name', None)}")
           EOF
 
       - name: Pull data with DVC
